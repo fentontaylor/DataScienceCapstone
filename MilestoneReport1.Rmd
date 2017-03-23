@@ -9,15 +9,15 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-##Introduction
+## Introduction
 
 The goal of this milestone report is to explore the major features of the text data given to us for the [Coursera](www.coursera.org) Data Science Capstone through Johns Hopkins University. The project is sponsored by SwiftKey. The end-goal is to create text-prediction application with R's Shiny package that predicts words using a natural language processing model. 
 
 The first step here is to get an idea of what kinds of pre-processing will be necessary to prepare the data for creating the model. Specifically, certain kinds of characters and words need to be removed and/or modified to aid in prediction accuracy. Finally, I need to create list of single words, and two/three word phrases to see which occur most frequently.
 
-##Downloading and Splitting the Raw Data
+## Downloading and Splitting the Raw Data
 
-###Load Libraries
+### Load Libraries
 
 The following R packages are necessary for this analysis.
 
@@ -30,7 +30,7 @@ library(stringr)
 library(pander)
 ```
 
-###Download
+### Download
 
 The following downloads the dataset and unzips it into the current working directory. Next,
 the files of interest are read into R with the `readLines` function. The data is available [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip).
@@ -47,7 +47,7 @@ news <- readLines(con = "./final/en_US/en_US.news.txt", encoding= "UTF-8", skipN
 twit <- readLines(con = "./final/en_US/en_US.twitter.txt", encoding= "UTF-8", skipNul = T)
 ```
 
-###Split Into Separate Files
+### Split Into Separate Files
 
 Now that the dataset has been obtained and the Corpus created, it needs to be split into a training set, development set, and test set. Since the files contain a large number of documents, a small sample of the training set will be created for exploratory analysis. The ratio will be 60% training, 20% development, and 20% test. The small training dataset for exploratory analysis will be 20% of the training set, or 12% of the total dataset.
 
@@ -110,7 +110,8 @@ write(test.twit, "data/test/test.twit.txt")
 
 ```
 
-###Basic File Information
+### Basic File Information
+
 Here we can see the list of files created, their file size, and a rough estimate
 of the number of words contained in each file. To get the word estimate, the `str_count`
 function from the `stringer` package was used to count the number of character sequences
@@ -162,7 +163,7 @@ pander(df)
 rm(df)
 ```
 
-##Transformations
+## Transformations
 
 I will briefly describe the transformations I did to the Corpus and my reasons or doing so.
 
@@ -177,7 +178,7 @@ I will briefly describe the transformations I did to the Corpus and my reasons o
 
 NOTE: Other common pre-processing steps such as stopword removal and stemming will not be done. Stopwords are the most commonly used words in a language and removing them will negatively affect prediction accuracy. Similarly, stemming, or removal of suffixes could have detrimental effects on prediction.
 
-###Check for Character Types
+### Check for Character Types
 ```{r corpus_1, cache=TRUE}
 corp <- VCorpus(DirSource("data/small"))
 myChars <- function(x, n=seq(x)) {
@@ -257,10 +258,10 @@ writeCorpus(corp, "./data/corp/small",
             filenames = c("cleanSmallBlog", "cleanSmallNews", "cleanSmallTwit"))
 ```
 
-##Data Analysis
+## Data Analysis
+
 After the transformations, I am ready to do some exploratory analysis to determine the
 most frequent unigrams, bigrams, and trigrams (sets of 1, 2, and 3 words that occur together).
-
 
 Let's first look and the list of characters in the corpus and a small sample of text from one of the documents to get a feel for how it looks.
 
@@ -272,7 +273,7 @@ print(myChars(corp), quote = F); print(strwrap(corp[[2]]$content[c(4,6)]), quote
 
 As you can see, the text has far fewer characters than the original document and only apostrophes for punctuation. This will make it so that all instances of the same word are matched regardless of accent marks and capitalization.
 
-###Frequency of Terms
+### Frequency of Terms
 
 At this point, I realized the limitations of my computer's ability to create document-term matrices using the `tm` package's `DocumentTermMatrix()` function. Luckily I found the  `quanteda` package, which performs many of the same functions as `tm`, but much faster, as much of its backend code is done in C++. (More on this in the Next Steps section below)
 
@@ -304,7 +305,7 @@ rm(tri)
 tri_freq <- tri_freq[-grep("EOS", tri_freq$n_gram),]
 ```
 
-##Visualization
+## Visualization
 
 Let's take a quick look at some plots of the most frequent unigrams, bigrams, and trigrams. I removed all instances of phrases that included the <EOS> tag, since it was by far the most common and I am only interested in intra-sentence phrases at this point.
 
@@ -324,11 +325,11 @@ top40(bi_freq, "40 Most Common Bigrams")
 top40(tri_freq, "40 Most Common Trigrams")
 ```
 
-##Next Steps
+## Next Steps
 
 As I mentioned earlier, the `quanteda` package's functions ran much faster on my machine. I will definitely use it for the remainder of the project. 
 
-####Building The Models
+#### Building The Models
 
 I need to do the following:  
 - Carefully reconsider all the pre-processing steps I used to see if there is anything important I missed.  
