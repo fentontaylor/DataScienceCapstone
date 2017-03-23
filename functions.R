@@ -299,6 +299,7 @@ do_gt_r <- function(df, threshold){
 }
 
 sgt_smooth <- function(df, threshold){
+    # wrapper function for all components of simple Good-Turing smoothing
     suppressMessages(require(dplyr))
     fm <- df %>% 
         freqMat() %>% 

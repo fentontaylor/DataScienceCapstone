@@ -16,30 +16,30 @@ twit <- readLines(con = "./final/en_US/en_US.twitter.txt", encoding= "UTF-8", sk
 # Split the files into training, dev, and test sets
 ################################################################################
 
-#Randomly permute the order of lines in the files for splitting
+# Randomly permute the order of lines in the files for splitting
 set.seed(310)
 blog <- blog[sample(seq(length(blog)))]
 news <- news[sample(seq(length(news)))]
 twit <- twit[sample(seq(length(twit)))]
 
-#Split the blog text
+# Split the blog text
 n <- length(blog)
 train.blog <- blog[1:floor(n*0.6)]
 dev.blog <- blog[(floor(n*0.6)+1):floor(n*0.8)]
 test.blog <- blog[(floor(n*0.8)+1):n]
-#Split the news text
+# Split the news text
 n <- length(news)
 train.news <- news[1:floor(n*0.6)]
 dev.news <- news[(floor(n*0.6)+1):floor(n*0.8)]
 test.news <- news[(floor(n*0.8)+1):n]
-#Split the twitter text
+# Split the twitter text
 n <- length(twit)
 train.twit <- twit[1:floor(n*0.6)]
 dev.twit <- twit[(floor(n*0.6)+1):floor(n*0.8)]
 test.twit <- twit[(floor(n*0.8)+1):n]
 
 ################################################################################
-#Write files for later use
+# Write files for later use
 ################################################################################
 
 if(!dir.exists("data")) {dir.create("data")}
@@ -71,6 +71,7 @@ library(quanteda)
 library(data.table)
 if(!dir.exists("data/train/train")) dir.create("data/train/train")
 if(!dir.exists("data/train/holdout")) dir.create("data/train/holdout")
+source("functions.R")
 
 ################################################################################
 # Split into training and holdout data for later use.
@@ -108,6 +109,7 @@ cleanPCorpus("data/test")
 # (anything bigger can't be processed all at once due to RAM limitations)
 ################################################################################
 
+# create_ngrams() is a custom function and can be found in the functions.R file
 create_ngrams("data/train/train/clean", "model_1", c("uni","bi","tri"))
 create_ngrams("data/train/holdout/clean", "model_1", c("uni","bi","tri"))
 
