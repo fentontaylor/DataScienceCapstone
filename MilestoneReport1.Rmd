@@ -1,0 +1,339 @@
+---
+title: "Natural Language Processing - Week 2 Milestone Report"
+author: "Fenton Taylor"
+date: "February 16, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Introduction
+
+The goal of this milestone report is to explore the major features of the text data given to us for the [Coursera](www.coursera.org) Data Science Capstone through Johns Hopkins University. The project is sponsored by SwiftKey. The end-goal is to create text-prediction application with R's Shiny package that predicts words using a natural language processing model. 
+
+The first step here is to get an idea of what kinds of pre-processing will be necessary to prepare the data for creating the model. Specifically, certain kinds of characters and words need to be removed and/or modified to aid in prediction accuracy. Finally, I need to create list of single words, and two/three word phrases to see which occur most frequently.
+
+##Downloading and Splitting the Raw Data
+
+###Load Libraries
+
+The following R packages are necessary for this analysis.
+
+```{r, load.lib, message=FALSE}
+library(tm)
+library(quanteda)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(pander)
+```
+
+###Download
+
+The following downloads the dataset and unzips it into the current working directory. Next,
+the files of interest are read into R with the `readLines` function. The data is available [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip).
+
+```{r, dl.and.split, cache=TRUE}
+fileURL <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+if(!file.exists(basename(fileURL))){
+    download.file(fileURL, basename(fileURL))
+    unzip(basename(fileURL))
+}
+
+blog <- readLines(con = "./final/en_US/en_US.blogs.txt", encoding= "UTF-8", skipNul = T)
+news <- readLines(con = "./final/en_US/en_US.news.txt", encoding= "UTF-8", skipNul = T)
+twit <- readLines(con = "./final/en_US/en_US.twitter.txt", encoding= "UTF-8", skipNul = T)
+```
+
+###Split Into Separate Files
+
+Now that the dataset has been obtained and the Corpus created, it needs to be split into a training set, development set, and test set. Since the files contain a large number of documents, a small sample of the training set will be created for exploratory analysis. The ratio will be 60% training, 20% development, and 20% test. The small training dataset for exploratory analysis will be 20% of the training set, or 12% of the total dataset.
+
+```{r, split.sets,cache=TRUE}
+#Randomly permute the order of lines in the files for splitting
+set.seed(310)
+blog <- blog[sample(seq(length(blog)))]
+news <- news[sample(seq(length(news)))]
+twit <- twit[sample(seq(length(twit)))]
+
+#Split the blog text
+n <- length(blog)
+train.blog <- blog[1:floor(n*0.6)]
+dev.blog <- blog[(floor(n*0.6)+1):floor(n*0.8)]
+test.blog <- blog[(floor(n*0.8)+1):n]
+#Split the news text
+n <- length(news)
+train.news <- news[1:floor(n*0.6)]
+dev.news <- news[(floor(n*0.6)+1):floor(n*0.8)]
+test.news <- news[(floor(n*0.8)+1):n]
+#Split the twitter text
+n <- length(twit)
+train.twit <- twit[1:floor(n*0.6)]
+dev.twit <- twit[(floor(n*0.6)+1):floor(n*0.8)]
+test.twit <- twit[(floor(n*0.8)+1):n]
+
+
+#Take a smaller sample of the training sets for exploratory analysis
+set.seed(424)
+n <- sample(seq(length(train.blog)))
+small.blog <- train.blog[n[1:floor(length(n)*0.2)]]
+n <- sample(seq(length(train.news)))
+small.news <- train.news[n[1:floor(length(n)*0.2)]]
+n <- sample(seq(length(train.twit)))
+small.twit <- train.twit[n[1:floor(length(n)*0.2)]]
+```
+
+Note: At this point, all the datasets are written to local files so that they can be 
+loaded later. Code is not shown.
+
+```{r, echo=FALSE, eval=FALSE}
+#Write files for later use
+if(!dir.exists("data")) {dir.create("data")}
+if(!dir.exists("data/small")) {dir.create("data/small")}
+if(!dir.exists("data/train")) {dir.create("data/train")}
+if(!dir.exists("data/test")) {dir.create("data/test")}
+if(!dir.exists("data/dev")) {dir.create("data/dev")}
+write(train.blog, "data/train/train.blog.txt")
+write(train.news, "data/train/train.news.txt")
+write(train.twit, "data/train/train.twit.txt")
+write(small.blog, "data/small/small.blog.txt")
+write(small.news, "data/small/small.news.txt")
+write(small.twit, "data/small/small.twit.txt")
+write(dev.blog, "data/dev/dev.blog.txt")
+write(dev.news, "data/dev/dev.news.txt")
+write(dev.twit, "data/dev/dev.twit.txt")
+write(test.blog, "data/test/test.blog.txt")
+write(test.news, "data/test/test.news.txt")
+write(test.twit, "data/test/test.twit.txt")
+
+```
+
+###Basic File Information
+Here we can see the list of files created, their file size, and a rough estimate
+of the number of words contained in each file. To get the word estimate, the `str_count`
+function from the `stringer` package was used to count the number of character sequences
+separated by a space. Specifically, with the call: `str_count(x, "\\S+")`.
+
+As you can see, the total number of words in the three "small" files totals 
+approximately 12 million, which should provide enough data for a representative
+exploratory analysis.
+
+```{r, file.info, echo=FALSE, cache=TRUE, fig.width=4}
+fileName <- c(dir("final/en_US"),
+              dir("data/train"),
+              dir("data/dev"),
+              dir("data/test"),
+              dir("data/small")) %>% {gsub(".txt","",.)}
+fileSize <- c(paste0("final/en_US/", dir("final/en_US")),
+              paste0("data/train/", dir("data/train")),
+              paste0("data/dev/", dir("data/dev")),
+              paste0("data/test/", dir("data/test")),
+              paste0("data/small/", dir("data/small"))) %>%
+            file.size %>% {./1024^2} %>% round(1) %>% {paste0(.," Mb")}
+df <- data.frame(fileName, fileSize)
+
+df$nLines <- sapply(list(blog,news,twit,train.blog,train.news,train.twit,
+                      dev.blog,dev.news,dev.twit,test.blog,test.news,test.twit,
+                      small.blog,small.news,small.twit),length)
+
+nWords <- function(x) {
+    str_count(x, "\\S+") %>%
+    sum
+}
+
+numWords <- sapply(list(blog,news,twit), nWords)
+numWords <- c(numWords, sapply(list(train.blog,train.news,train.twit), nWords))
+numWords <- c(numWords, sapply(list(dev.blog,dev.news,dev.twit), nWords))
+numWords <- c(numWords, sapply(list(test.blog,test.news,test.twit), nWords))
+numWords <- c(numWords, sapply(list(small.blog,small.news,small.twit), nWords))
+df$numWords <- numWords
+df$avgNumWords <- round(df$numWords/df$nLines,1)
+df$numWords <- format(numWords, big.mark = ",")
+df$nLines <- format(df$nLines, big.mark = ",")
+rm(blog,news,twit,train.blog,train.news,train.twit,dev.blog,dev.news,dev.twit,
+   test.blog,test.news,test.twit,fileName,fileSize,numWords,small.blog, 
+   small.news,small.twit,n)
+panderOptions('table.alignment.default', c('left','right','right','right','right'))
+saveRDS(df, "data/basicInfo.rds")
+row.names(df) <- 1:15
+pander(df)
+rm(df)
+```
+
+##Transformations
+
+I will briefly describe the transformations I did to the Corpus and my reasons or doing so.
+
+1. Check the types of characters and transform to ASCII to eliminate foreign letters and symbols.  
+2. Remove profanity words found on this [list](https://www.freewebheaders.com/full-list-of-bad-words-banned-by-google/) so that the prediction app will not produce obscene words.  
+3. Remove all unicode tags "<>", Twitter-style hashtag "#" words, and urls because they are not actual words.  
+4. Remove all remaining punctuation except for end-of-sentence (EOS) punctuation and apostrophes. In some cases, it is useful to remove all punctuation, but in this case, the EOS punctuation provides meaningful context to bigrams and trigrams. Apostrophes are preserved because eliminating them could destroy context as well.  
+5. Create an <EOS>, end-of-sentence, tag to replace all ". ! ?" for context clarity.  
+6. Clean up various irregularities caused by the previous transformations.
+7. Remove all numbers since they are not words. I will later explore using a <NUM> tag instead.  
+8. Strip all excess whitespace to clean up the mess created by all the other transformations.  
+
+NOTE: Other common pre-processing steps such as stopword removal and stemming will not be done. Stopwords are the most commonly used words in a language and removing them will negatively affect prediction accuracy. Similarly, stemming, or removal of suffixes could have detrimental effects on prediction.
+
+###Check for Character Types
+```{r corpus_1, cache=TRUE}
+corp <- VCorpus(DirSource("data/small"))
+myChars <- function(x, n=seq(x)) {
+    # x: a Corpus
+    # n: the elements of x for which characters will be returned
+    require(dplyr)
+    t <- character()
+    for(i in n){
+        t <- c(t, x[[i]][[1]])
+    }
+    t %>%
+    str_split("") %>%
+    sapply(function(x) x[-1]) %>%
+    unlist %>%
+    unique %>%
+    sort(dec=F)
+}
+chars <- myChars(corp)
+print(chars, quote = F)
+```
+
+There are lots of foreign characters and symbols that are unnecessary or harmful to 
+prediction, so they need to be converted or deleted. 
+
+```{r, to_ASCII, cache=TRUE}
+dat <- sapply(corp, function(row) iconv(row, "latin1", "ASCII", sub=""))
+corp <- VCorpus(VectorSource(dat)); rm(dat)
+chars <- myChars(corp)
+print(chars, quote = F)
+```
+
+Now, the number of characters has been drastically reduced and can be more easily dealt with
+in the following transformations. 
+
+```{r, transforms, cache=TRUE}
+swap <- content_transformer(function(x, from, to) gsub(from, to, x))
+corp <- tm_map(corp, content_transformer(tolower))
+# Remove profanity words
+profanityWords <- readLines(con="data/profanityWords.txt", skipNul = T)
+corp <- tm_map(corp, removeWords, profanityWords)
+# Replace all foreign unicode character codes with a space
+corp <- tm_map(corp, swap, "<.*>", " ")
+# Delete all twitter-style hashtag references
+corp <- tm_map(corp, swap, "#.*", " ")
+# Delete website names
+corp <- tm_map(corp, swap, "www\\..*", " ")
+corp <- tm_map(corp, swap, ".*\\.com", " ")
+# Replace all punctuation except EOS punctuation and apostrophe with a space
+corp <- tm_map(corp, swap, "[^[:alnum:][:space:]\'\\.\\?!]", " ")
+# Delete numbers with decimal places
+corp <- tm_map(corp, swap, "[0-9]+\\.[0-9]+", "")
+# Replace all instances of multiple EOS punctuation with one instance
+corp <- tm_map(corp, swap, "([\\.\\?!]){2,}", ". ")
+# Replace . ? ! with <EOS> tag
+corp <- tm_map(corp, swap, "\\. |\\.$", " <EOS> ")
+corp <- tm_map(corp, swap, "\\? |\\?$", " <EOS> ")
+corp <- tm_map(corp, swap, "! |!$", " <EOS> ")
+# Fix instances of probable accidental typo with EOS punctuation
+corp <- tm_map(corp, swap, "[[:alnum:]]+\\?[[:alnum:]]+", " <EOS> ")
+corp <- tm_map(corp, swap, "[[:alnum:]]+![[:alnum:]]+", " <EOS> ")
+# Remove any extra ? !
+corp <- tm_map(corp, swap, "!", " ")
+corp <- tm_map(corp, swap, "\\?", " ")
+# Convert very common occurence of u.s to US
+corp <- tm_map(corp, swap, "u\\.s", "US")
+corp <- tm_map(corp, swap, "\\.", "")
+# Clean up leftover punctuation artifacts
+corp <- tm_map(corp, swap, " 's", " ")
+corp <- tm_map(corp, swap, " ' ", " ")
+corp <- tm_map(corp, swap, "\\\\", " ")
+
+corp <- tm_map(corp, removeNumbers)
+corp <- tm_map(corp, stripWhitespace)
+if(!dir.exists("./data/corp")) {dir.create("./data/corp")}
+if(!dir.exists("./data/corp/small")) {dir.create("./data/corp/small")}
+writeCorpus(corp, "./data/corp/small",
+            filenames = c("cleanSmallBlog", "cleanSmallNews", "cleanSmallTwit"))
+```
+
+##Data Analysis
+After the transformations, I am ready to do some exploratory analysis to determine the
+most frequent unigrams, bigrams, and trigrams (sets of 1, 2, and 3 words that occur together).
+
+
+Let's first look and the list of characters in the corpus and a small sample of text from one of the documents to get a feel for how it looks.
+
+```{r explore1, cache=TRUE}
+rm(corp) # Reload the corpus from the new file to ensure changes are set
+corp <- VCorpus(DirSource("data/corp/small"))
+print(myChars(corp), quote = F); print(strwrap(corp[[2]]$content[c(4,6)]), quote=F)
+```
+
+As you can see, the text has far fewer characters than the original document and only apostrophes for punctuation. This will make it so that all instances of the same word are matched regardless of accent marks and capitalization.
+
+###Frequency of Terms
+
+At this point, I realized the limitations of my computer's ability to create document-term matrices using the `tm` package's `DocumentTermMatrix()` function. Luckily I found the  `quanteda` package, which performs many of the same functions as `tm`, but much faster, as much of its backend code is done in C++. (More on this in the Next Steps section below)
+
+```{r tokenizers, cache=TRUE}
+corp <- quanteda::corpus(corp)
+freq_df <- function(x){
+    # This helper function takes a token output and outputs a sorted N-gram frequency table
+    fr <- sort(colSums(as.matrix(x)),decreasing = TRUE)
+    df <- data.table(n_gram = names(fr), freq=fr, row.names = NULL)
+    return(df)
+}
+
+# Create N-grams and dataframes
+uni <- dfm(tokens(corp, removeSymbols=TRUE), tolower=FALSE)
+uni_freq <- freq_df(uni)
+rm(uni)
+uni_freq <- uni_freq[-1,]
+
+biToks <- tokens_ngrams(tokens(corp, removeSymbols=TRUE), n=2L)
+bi <- dfm(biToks, tolower=FALSE); rm(biToks)
+bi_freq <- freq_df(bi)
+rm(bi)
+bi_freq <- bi_freq[-grep("EOS", bi_freq$n_gram),]
+
+triToks <- tokens_ngrams(tokens(corp, removeSymbols=TRUE), n=3L)
+tri <- dfm(triToks, tolower=FALSE); rm(triToks)
+tri_freq <- freq_df(tri)
+rm(tri)
+tri_freq <- tri_freq[-grep("EOS", tri_freq$n_gram),]
+```
+
+##Visualization
+
+Let's take a quick look at some plots of the most frequent unigrams, bigrams, and trigrams. I removed all instances of phrases that included the <EOS> tag, since it was by far the most common and I am only interested in intra-sentence phrases at this point.
+
+```{r plotNgrams, cache=TRUE}
+top40 <- function(df, title) {
+    df <- df[1:40,]
+    df$n_gram <- factor(df$n_gram, levels = df$n_gram[order(-df$freq)])
+  ggplot(df, aes(x = n_gram, y = freq)) +
+    geom_bar(stat = "identity", fill = "dodgerblue3", colour = "gray40") +
+    labs(title = title, x="N-Gram", y="Count") +
+    theme(axis.text.x = element_text(angle=60, size=12, hjust = 1),
+          axis.title = element_text(size=14, face="bold"),
+          plot.title = element_text(size=16, face="bold"))
+}
+top40(uni_freq, "40 Most Common Unigrams")
+top40(bi_freq, "40 Most Common Bigrams")
+top40(tri_freq, "40 Most Common Trigrams")
+```
+
+##Next Steps
+
+As I mentioned earlier, the `quanteda` package's functions ran much faster on my machine. I will definitely use it for the remainder of the project. 
+
+####Building The Models
+
+I need to do the following:  
+- Carefully reconsider all the pre-processing steps I used to see if there is anything important I missed.  
+- Create dataframes of 1-,2-,3-, and possibly 4-grams based on the larger training dataset including word-relation frequencies.  
+- Look into using the `filehash` package to load parts of the data at a time to get around my machine's RAM limitations.  
+- Create and test several prediction algorithms, with and without <EOS> and <NUM> tags and apply them to the development dataset to determine their efficacy and speed.  
+- Find a way to use either Katz backoff or Kneser-Ney smoothing to deal with unknown words.  
+- The final goal is to create a Shiny app, with a simple user interface that provides reactive predictions as quickly and accurately as possible.  
