@@ -59,8 +59,8 @@ ui <- dashboardPage(
                                     Instructions</span>'),
                         HTML('<b>Input</b><br>
                             <p style="text-indent: 25px"> Simply type in any phrase you want to the text box above.
-                            The prediction algorithm will search up to the last 5 words
-                            input and return the most probable word(s) according to the desired 
+                            The prediction algorithm will search up to the last 5 words from the
+                            input string and return the most probable word(s) according to the desired 
                             parameters, which can be selected in the "Paramters" box.</p>
                             <b>Parameters</b><br>
                             <ul>
@@ -125,7 +125,7 @@ ui <- dashboardPage(
                 )
             ),
             tabItem(tabName = "doc", 
-                tabsetPanel(
+                tabBox(width = 12,
                     tabPanel(title=HTML('<span style="font-weight:bold; font-size:18px; color:#1E77AB">Documentation</span>'),
                         HTML("<br>
                              <ul>
@@ -133,7 +133,7 @@ ui <- dashboardPage(
                              <li>To get a feel for exactly what the cleaning function does, you can go to The Data section to view samples of pre/post-processed text.</li>
                              <li>If you want to see the actual source code for this app and the entire project, click on the link to my GitHub repository for the project in the Source Code tab.</li>
                              <br>
-                             <b>Cleaning the Input Text</b>
+                             <span style='font-weight:bold;font-size:18px'>Cleaning the Input Text</span>
                              <p>The input text is cleaned with the essentially the same function used to clean the texts in the training corpus. Those steps inlcude:</p>
                              <ol>
                              <li>Convert characters to ASCII.</li>
@@ -155,7 +155,7 @@ ui <- dashboardPage(
                              <li>Remove any white-space at the end of the string.</li>
                              <br>
                              </ol>
-                             <b>How the Algorithm Works</b>
+                             <span style='font-weight:bold;font-size:18px'>How the Algorithm Works</span>
                              <ol>
                              <li>Get the length (<var>m</var>) of the clean text string (<var>x</var>) and feed it into a for-loop <code>for (i in m:1)</code> where <var>m</var> is controlled to be less than or equal to 5. Each iteration of the for-loop does:</li>
                              <ul>
@@ -169,8 +169,24 @@ ui <- dashboardPage(
                              <li>Extract the list of words that complete the search string <var>x</var>.</li>
                              <li>Return the top word(s) according to the user's desired maximum.</li>
                              </ol>")),
-                    tabPanel(title=HTML('<span style="font-weight:bold; font-size:18px; color:#1E77AB">About</span>')),
-                    tabPanel(title=HTML('<span style="font-weight:bold; font-size:18px; color:#1E77AB">Source Code</span>'))
+                    tabPanel(title=HTML('<span style="font-weight:bold; font-size:18px; color:#1E77AB">About</span>'),
+                             HTML('<br>
+                                  <p style="text-indent: 25px">This application was created for the final assignment of the Johns Hopkins University Data Science Specialization Capstone Project through <a href="https://www.coursera.org/specializations/jhu-data-science"><b>Coursera.org</b></a>.
+                                  All natural language processing tasks were done in RStudio using the R packages <a href="https://cran.r-project.org/package=tm"><b>tm</b></a> and <a href="https://cran.r-project.org/package=quanteda"><b>quanteda</b></a>.
+                                  Other packages that were utilized were <a href="https://cran.r-project.org/package=dplyr"><b>dplyr</b></a>, <a href="https://cran.r-project.org/package=stringi"><b>stringi</b></a>, 
+                                  <a href="https://cran.r-project.org/package=data.table"><b>data.table</b></a>, and <a href="https://cran.r-project.org/package=filehash"><b>filehash</b></a>.</p>
+                                  <br>
+                                  <p style="text-indent: 25px">The texts for this project come from <a href="https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip">this dataset</a>. The data are approximately 4 million lines of
+                                  text from blogs, online news publications, and Twitter posts. Incorporating texts from varied sources probably lowers prediction accuracy compared to training a model and predicting for a specific
+                                  genre of text. However, using texts from sources with varied styles of writing and vocabulary makes the prediction algorithm more generalizable.</p>
+                                  <br>
+                                  <p style="text-indent: 25px">The texts were split into 60% training, 20% development, and 20% test sets. The training set was further split equally into training and holdout sets. The holdout
+                                  set is necessary for some smoothing techniques and methods for dealing with unseen words. However, for the current prediction algorithm, only simple Good-Turing smoothing was performed on the
+                                  counts of the N-grams of length 1 to 6. 
+                                  </p>')),
+                    tabPanel(title=HTML('<span style="font-weight:bold; font-size:18px; color:#1E77AB">Source Code</span>'),
+                             HTML("<br><p style='font-size:16px'>All relevant files for this project and application can be view at this 
+                                  <a href='https://github.com/fentontaylor/DataScienceCapstone'>GitHub Repository</a>.</p>"))
                 )
             )
         )
