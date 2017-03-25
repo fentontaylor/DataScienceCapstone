@@ -21,6 +21,12 @@ subsetTextLines <- function(x, percent, destfile=NULL, encoding="UTF-8", seed, s
                                fileEncoding = encoding)
 }
 
+nWords <- function(x) {
+    suppressMessages(require(stringr))
+    str_count(x, "\\S+") %>%
+        sum
+}
+
 myChars <- function(x, n=seq(x)) {
     # x: a Corpus
     # n: the elements of x for which characters will be returned
@@ -111,7 +117,7 @@ cleanPCorpus <- function(x) {
     print("PROCESSING SUCCESSFULLY FINISHED")
 }
 
-cleanText <- function(x) {
+cleanTextFull <- function(x) {
     require(tm)
     require(stringi)
     x <-  iconv(x, "latin1", "ASCII", sub="")
@@ -140,6 +146,20 @@ cleanText <- function(x) {
     x <- tm_map(x, swap, "\\\\", " ")
     x <- tm_map(x, stripWhitespace)
     x[[1]]$content
+}
+
+cleanTextQuick <- function(x) {
+    suppressMessages(require(stringi))
+    x <- tolower(x)
+    x <- stri_replace_all_regex(x, "[[:alnum:][:punct:]]+\\.(?:com|org|net|gov|co\\.uk|aws|fr|de)([\\/[:alnum:][:punct:]]+)?", "webURL")
+    x <- stri_replace_all_regex(x, "[^[:alnum:][:space:]\'\\.\\?!]", "")
+    x <- stri_replace_all_regex(x, "[0-9]+\\.[0-9]+", "")
+    x <- stri_replace_all_regex(x, "[0-9]+(\\w*)?", "")
+    x <- stri_replace_all_regex(x, "([\\.\\?!]){2,}", ". ")
+    x <- stri_replace_all_regex(x, "\\. |\\.$", " <EOS> ")
+    x <- stri_replace_all_regex(x, "\\? |\\?$|\\b\\?\\b", " <EOS> ")
+    x <- stri_replace_all_regex(x, "! |!$|\\b!\\b", " <EOS> ")
+    x <- stri_replace_all_regex(x, "[ ]{2,}", " ")
 }
 
 n_toks <- function(toks, ng, name, saveDir, saveAll){
@@ -333,8 +353,31 @@ splitText <- function(directory, files, chunkSize){
         close(con)
     }
 }
+ngram_list <- function(files, trim=NULL, save=NULL){
+    nl <- list()
+    
+    nl[["bi"]] <- readRDS(files[2])
+    if( !is.null(trim) ) nl$bi <- nl$bi[nl$bi$freq > trim, ]
+    
+    nl[["tri"]] <- readRDS(files[3])
+    if( !is.null(trim) ) nl$tri <- nl$tri[nl$tri$freq > trim, ]
+    
+    nl[["quad"]] <- readRDS(files[4])
+    if( !is.null(trim) ) nl$quad <- nl$quad[nl$quad$freq > trim, ]
+    
+    nl[["five"]] <- readRDS(files[5])
+    if( !is.null(trim) ) nl$five <- nl$five[nl$five$freq > trim, ]
+    
+    nl[["six"]] <- readRDS(files[6])
+    if( !is.null(trim) ) nl$six <- nl$six[nl$six$freq > trim, ]
+    
+    if( !is.null(save) ) { saveRDS(nl, save) }
+    
+    nl
+    
+}
 
-predictNext <- function(x, ngrams, num=1) {
+nextWord <- function(x, ngrams, num=1) {
     # x: a character string
     # ngrams: list of n-grams
     # n: number of words to return
@@ -367,3 +410,29 @@ predictNext <- function(x, ngrams, num=1) {
     words[1:num]
 }
 
+trimString <- function(x, n) {
+    suppressMessages(require(stringi))
+    temp <- stri_split_fixed(x, " ", simplify = T)
+    paste(temp[1:n], collapse = " ")
+}
+
+getLastWord <- function(x){
+    suppressMessages(require(stringi))
+    temp <- stri_split_fixed(x, " ", simplify = T)
+    n <- length(temp)
+    temp[n]
+}
+
+pruneNgrams <- function(x, n, save = NULL) {
+    # x : ngram list
+    # n : number of each group to keep
+    #save : file.path to save pruned ngram list
+    
+    suppressMessages(require(data.table))
+    x <- data.table(x)
+    x <- x[ , group := sapply(words, function(z) trimString(z, n))]
+    x <- setorder(setDT(x), group, -pr)[, index := seq_len(.N), group][index <= 5L]
+    x <- x[, c("group", "index") := NULL]
+    if( !is.null(save) ) saveRDS(x, save)
+    x
+}

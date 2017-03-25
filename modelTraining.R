@@ -93,6 +93,7 @@ for(i in grep("txt$", dir("data/train"), value = T)){
 ################################################################################
 # Run cleanPCorpus() custom function to process the text for analysis
 ################################################################################
+
 fileURL <- "http://www.freewebheaders.com/wordpress/wp-content/uploads/full-list-of-bad-words-banned-by-google-txt-file.zip"
 download.file(fileURL, "data/profanityWords.zip")
 unzip("data/profanityWords.zip", exdir = "data")
@@ -225,31 +226,10 @@ rm(dir1,dir2)
 # Create list of 1 to 6-grams with smoothed counts for prediction algorithm
 ################################################################################
 
+source("functions.R")
 saveDir <- "data/train/train/clean/smooth"
 files <- file.path(saveDir,dir(saveDir))
-ngram_list <- function(files, trim=NULL, save=NULL){
-    nl <- list()
-    
-    nl[["bi"]] <- readRDS(files[2])
-    if( !is.null(trim) ) nl$bi <- nl$bi[nl$bi$freq > trim, ]
-    
-    nl[["tri"]] <- readRDS(files[3])
-    if( !is.null(trim) ) nl$tri <- nl$tri[nl$tri$freq > trim, ]
-    
-    nl[["quad"]] <- readRDS(files[4])
-    if( !is.null(trim) ) nl$quad <- nl$quad[nl$quad$freq > trim, ]
-    
-    nl[["five"]] <- readRDS(files[5])
-    if( !is.null(trim) ) nl$five <- nl$five[nl$five$freq > trim, ]
-    
-    nl[["six"]] <- readRDS(files[6])
-    if( !is.null(trim) ) nl$six <- nl$six[nl$six$freq > trim, ]
-    
-    if( !is.null(save) ) { saveRDS(nl, save) }
-    
-    nl
-    
-}
+# ngram_list is a custom function
 system.time(ngrams <- ngram_list(files, trim=1, save=file.path(saveDir,"ngrams_smooth_trim1.rds")))
 rm(ngrams)
 system.time(ngrams <- ngram_list(files, trim=5, save=file.path(saveDir,"ngrams_smooth_trim5.rds")))
@@ -258,6 +238,7 @@ rm(list=ls())
 ################################################################################
 # Create short list of top 25 n-grams for app
 ################################################################################
+
 saveDir <- "data/train/train/clean/smooth"
 files <- file.path(saveDir, dir(saveDir))
 shortList <- list()
@@ -284,6 +265,7 @@ rm(list=ls())
 ################################################################################
 # Create small samples for app
 ################################################################################
+
 b <- readLines("data/train/train/train.blog.txt")
 b <- sample(b, 200)
 b <- b[(nchar(b)>50 & nchar(b) <300)]
@@ -308,3 +290,77 @@ sampleText$text <- as.character(sampleText$text)
 saveRDS(sampleText, "data/train/train/samples/sampleText.rds")
 file.copy("data/train/train/samples/sampleText.rds", "textPredictor/data/sampleText.rds")
 rm(list=ls())
+
+################################################################################
+# prune n-gram list to only have top 5 completions
+################################################################################
+
+source("functions.R")
+ng <- readRDS("data/train/train/clean/smooth/ngrams_smooth_trim1.rds")
+ng[[1]] <- pruneNgrams(ng[[1]], n = 1)
+ng[[2]] <- pruneNgrams(ng[[2]], n = 2)
+ng[[3]] <- pruneNgrams(ng[[3]], n = 3)
+ng[[4]] <- pruneNgrams(ng[[4]], n = 4)
+ng[[5]] <- pruneNgrams(ng[[5]], n = 5)
+
+f1 <- "data/train/train/clean/smooth/ngrams_smooth_trim1_prune.rds"
+saveRDS(ng, f1)
+ng <- lapply(ng, function(x) x[ freq > 5 ])
+f2 <- "data/train/train/clean/smooth/ngrams_smooth_trim5_prune.rds"
+saveRDS(ng, f2)
+file.copy(f1, file.path("textPredictor/data", basename(f1)))
+file.copy(f2, file.path("textPredictor/data", basename(f2)))
+
+################################################################################
+# Create benchmarking test data to test model accuracy and speed
+################################################################################
+
+source("functions.R")
+suppressMessages(require(stringi))
+suppressMessages(require(dplyr))
+b <- readLines("data/test/clean/clean_test.blog.txt")
+n <- readLines("data/test/clean/clean_test.news.txt")
+t <- readLines("data/test/clean/clean_test.twit.txt")
+set.seed(333)
+b <- sample(b, 1500)
+n <- sample(n, 1500)
+t <- sample(t, 1500)
+testSample <- c(b, n, t)
+rm(b, n, t)
+testSample <- gsub("<EOS>.*", "", testSample)
+testSample <- gsub("<NUM>", "", testSample)
+testSample <- gsub("[ ]{2,}", " ", testSample)
+testSample <- gsub("^ | $", "", testSample)
+testSample <- data.frame(phrase=testSample, nWords=stri_count_regex(testSample, "\\S+"))
+testSample <- filter(testSample, nWords > 5 )
+
+
+testSample$trimPhrase <- sapply(testSample$phrase, function(x) trimString(x, 6))
+testSample$predString <- sapply(testSample$trimPhrase, function(x) trimString(x, 5))
+
+
+
+testSample$actual <- sapply(testSample$trimPhrase, getLastWord)
+saveRDS(testSample, "data/test/clean/testSample_full_df.rds")
+testSample <- testSample[,c("predString", "actual")]
+set.seed(1984)
+testSample <- testSample[sample(1:nrow(testSample),3000),]
+saveRDS(testSample, "data/test/clean/ts_opt.rds") 
+rm(list=ls())
+
+################################################################################
+# Create Benchmarking function to test model speed and accuracy
+################################################################################
+
+source("functions.R")
+pstrings <- readRDS("data/test/clean/ts_opt.rds")
+ng <- readRDS("data/train/train/clean/smooth/ngrams_smooth_trim5.rds")
+ng2
+preds <- sapply(pstrings$predString, function(x) nextWord(x, ng, num=5))
+pstrings <- cbind(pstrings, t(preds))
+names(pstrings)[3:7] <- c("p1","p2", "p3","p4","p5")
+pstrings$top <- pstrings$actual==pstrings$p1
+sum(pstrings$top,na.rm = T)/3000
+pstrings$top3 <- any(pstrings[,3:5]==pstrings$actual)
+pstrings$top5 <- any(pstrings[,3:7]==pstrings$actual)
+sum(pstrings$top3)/3000

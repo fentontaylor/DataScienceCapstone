@@ -2,16 +2,15 @@ library(shiny)
 library(shinydashboard)
 library(stringi)
 library(dplyr)
-library(ggplot2)
 suppressMessages(library(tm))
 
 # Load n-gram tables and data exploration files
-ngrams_accuracy <- readRDS("data/ngrams_smooth_trim1.rds")
-ngrams_speed <- readRDS("data/ngrams_smooth_trim5.rds")
+ngrams_accuracy <- readRDS("data/ngrams_smooth_trim1_prune.rds")
+ngrams_speed <- readRDS("data/ngrams_smooth_trim5_prune.rds")
 shortList <- readRDS("data/shortList.rds")
 sampleText <- readRDS("data/sampleText.rds")
-
-cleanText <- function(x) {
+topFive <- shortList[[1]]$words[1:5]
+cleanTextFull <- function(x) {
     x <-  iconv(x, "latin1", "ASCII", sub="")
     x <- VCorpus(VectorSource(x))
     swap <- content_transformer(function(x, from, to) gsub(from, to, x))
@@ -40,6 +39,20 @@ cleanText <- function(x) {
     x[[1]]$content
 }
 
+cleanTextQuick <- function(x) {
+    suppressMessages(require(stringi))
+    x <- tolower(x)
+    x <- stri_replace_all_regex(x, "[[:alnum:][:punct:]]+\\.(?:com|org|net|gov|co\\.uk|aws|fr|de)([\\/[:alnum:][:punct:]]+)?", "webURL")
+    x <- stri_replace_all_regex(x, "[^[:alnum:][:space:]\'\\.\\?!]", "")
+    x <- stri_replace_all_regex(x, "[0-9]+\\.[0-9]+", "")
+    x <- stri_replace_all_regex(x, "[0-9]+(\\w*)?", "")
+    x <- stri_replace_all_regex(x, "([\\.\\?!]){2,}", ". ")
+    x <- stri_replace_all_regex(x, "\\. |\\.$", " <EOS> ")
+    x <- stri_replace_all_regex(x, "\\? |\\?$|\\b\\?\\b", " <EOS> ")
+    x <- stri_replace_all_regex(x, "! |!$|\\b!\\b", " <EOS> ")
+    x <- stri_replace_all_regex(x, "[ ]{2,}", " ")
+}
+
 shinyServer(function(input, output) {
   
     ngrams <- reactive({
@@ -50,7 +63,7 @@ shinyServer(function(input, output) {
     predList <- reactive({
         # Clean the text with the same process that generated n-gram lists
         x <- input$text
-        x <- cleanText(x)
+        x <- cleanTextQuick(x)
         # Delete text before EOS punctuation since it will skew prediction.
         x <- gsub(".*<EOS>", "", x)
         x <- gsub(" $", "", x)
@@ -85,7 +98,7 @@ shinyServer(function(input, output) {
             } else if (input$text != "" & predList()$x == "") {
                 print("Please continue typing...")
             } else {
-                paste(shortList[[1]]$words[1:max], collapse = " | ")
+                paste(topFive[1:max], collapse = " | ")
             }
         } else if ( n > max ) { 
             paste(words[1:max], collapse = " | ")
@@ -96,8 +109,7 @@ shinyServer(function(input, output) {
     
     output$details <- renderUI({
         if(input$showDetails) {
-            HTML('<p><b>Prediction String: </b>"', predList()$x, '"</p>
-                  <p><b>Results Returned: </b>', length(predList()$words),'</p>')  
+            HTML('<p><b>Prediction String: </b>"', predList()$x, '"</p>')  
         } else NULL
     })
   
@@ -105,7 +117,7 @@ shinyServer(function(input, output) {
           selection1 <- which(c("1-grams", "2-grams", "3-grams","4-grams", "5-grams", "6-grams")==input$ngram)
           selection2 <- which(c("Raw Count", "Smoothed Count", 
                                 "Smoothed Probability")==input$plotBy)+1
-          df <- shortList[[selection1]]
+          df <- data.frame(shortList[[selection1]])
           par(las=2, mar=c(5, 2, 1, 10))  
           bp <- barplot(rev(df[,selection2]), horiz = TRUE, col = "#FF773D",
                   border = NA, space = .4, ylim = c(1,50), width=1.5)
@@ -128,6 +140,6 @@ shinyServer(function(input, output) {
     })
 
     output$textOut <- renderText({
-        cleanText(sampleTextIn())
+        cleanTextFull(sampleTextIn())
     })
 })
