@@ -220,7 +220,7 @@ for(i in seq(files)){
     df <- sgt_smooth(df, 5)
     saveRDS(df, file.path(saveDir,paste0(i, "-gram_smooth.rds")))
 }
-rm(dir1,dir2)
+rm(dir1, dir2)
 
 ################################################################################
 # Create list of 1 to 6-grams with smoothed counts for prediction algorithm
@@ -295,6 +295,9 @@ rm(list=ls())
 # prune n-gram list to only have top 5 completions
 ################################################################################
 
+# Because the prediction algorithm only returns the top 5 of each N-gram completion,
+# all other completions can be discarded to reduce the size of the model without affecting accuracy.
+
 source("functions.R")
 ng <- readRDS("data/train/train/clean/smooth/ngrams_smooth_trim1.rds")
 ng[[1]] <- pruneNgrams(ng[[1]], n = 1)
@@ -322,9 +325,9 @@ b <- readLines("data/test/clean/clean_test.blog.txt")
 n <- readLines("data/test/clean/clean_test.news.txt")
 t <- readLines("data/test/clean/clean_test.twit.txt")
 set.seed(333)
-b <- sample(b, 1500)
-n <- sample(n, 1500)
-t <- sample(t, 1500)
+b <- sample(b, 1000)
+n <- sample(n, 1000)
+t <- sample(t, 1000)
 testSample <- c(b, n, t)
 rm(b, n, t)
 testSample <- gsub("<EOS>.*", "", testSample)
@@ -334,17 +337,14 @@ testSample <- gsub("^ | $", "", testSample)
 testSample <- data.frame(phrase=testSample, nWords=stri_count_regex(testSample, "\\S+"))
 testSample <- filter(testSample, nWords > 5 )
 
-
 testSample$trimPhrase <- sapply(testSample$phrase, function(x) trimString(x, 6))
 testSample$predString <- sapply(testSample$trimPhrase, function(x) trimString(x, 5))
-
-
 
 testSample$actual <- sapply(testSample$trimPhrase, getLastWord)
 saveRDS(testSample, "data/test/clean/testSample_full_df.rds")
 testSample <- testSample[,c("predString", "actual")]
 set.seed(1984)
-testSample <- testSample[sample(1:nrow(testSample),3000),]
+testSample <- testSample[sample(1:nrow(testSample), 1000),]
 saveRDS(testSample, "data/test/clean/ts_opt.rds") 
 rm(list=ls())
 
@@ -352,15 +352,41 @@ rm(list=ls())
 # Create Benchmarking function to test model speed and accuracy
 ################################################################################
 
+require(data.table)
+require(microbenchmark)
 source("functions.R")
 pstrings <- readRDS("data/test/clean/ts_opt.rds")
-ng <- readRDS("data/train/train/clean/smooth/ngrams_smooth_trim5.rds")
-ng2
-preds <- sapply(pstrings$predString, function(x) nextWord(x, ng, num=5))
-pstrings <- cbind(pstrings, t(preds))
-names(pstrings)[3:7] <- c("p1","p2", "p3","p4","p5")
-pstrings$top <- pstrings$actual==pstrings$p1
-sum(pstrings$top,na.rm = T)/3000
-pstrings$top3 <- any(pstrings[,3:5]==pstrings$actual)
-pstrings$top5 <- any(pstrings[,3:7]==pstrings$actual)
-sum(pstrings$top3)/3000
+pstrings <- data.table(pstrings)
+pstrings <- pstrings[1:10,]
+ng <- readRDS("data/train/train/clean/smooth/ngrams_smooth_trim5_prune.rds")
+ng2 <- readRDS("data/train/train/clean/smooth/ngrams_smooth_trim1_prune.rds")
+
+time_trim5 <- system.time(preds_trim5 <- sapply(pstrings$predString, function(x) nextWord(x, ng, num=5)))
+preds_trim5 <- cbind(pstrings, t(preds_trim5))
+names(preds_trim5)[3:7] <- c("p1","p2","p3","p4","p5")
+
+preds_trim5$top <- preds_trim5$p1==preds_trim5$actual
+preds_trim5$top3 <- (preds_trim5$p1==preds_trim5$actual | preds_trim5$p2==preds_trim5$actual | preds_trim5$p3==preds_trim5$actual)
+preds_trim5$top5 <- (preds_trim5$top3==TRUE | preds_trim5$p4==preds_trim5$actual | preds_trim5$p5==preds_trim5$actual)
+saveRDS(preds_trim5, "data/test/clean/preds_trim5.rds")
+
+time_trim1 <- system.time(preds_trim1 <- sapply(pstrings$predString, function(x) nextWord(x, ng2, 5)))
+preds_trim1 <- cbind(pstrings, t(preds_trim1))
+names(preds_trim1)[3:7] <- c("p1","p2","p3","p4","p5")
+preds_trim1$top <- preds_trim1$p1==preds_trim1$actual
+preds_trim1$top3 <- (preds_trim1$p1==preds_trim1$actual | preds_trim1$p2==preds_trim1$actual | preds_trim1$p3==preds_trim1$actual)
+preds_trim1$top5 <- (preds_trim1$top3==TRUE | preds_trim1$p4==preds_trim1$actual | preds_trim1$p5==preds_trim1$actual)
+saveRDS(preds_trim1, "data/test/clean/preds_trim")
+
+results <- data.frame(model=c("smooth_trim5_prune", "smooth_trim1_prune"), 
+                      top_accuracy=c(sum(preds_trim5$top, na.rm = T)/1000,
+                                     sum(preds_trim1$top, na.rm = T)/1000),
+                      top3_accuracy=c(sum(preds_trim5$top3, na.rm = T)/1000,
+                                     sum(preds_trim1$top3, na.rm = T)/1000),
+                      top5_accuracy=c(sum(preds_trim5$top5, na.rm = T)/1000,
+                                     sum(preds_trim1$top5, na.rm = T)/1000),
+                      avg_time=c(time_trim5[1]/1000,
+                                 time_trim1[1]/1000))
+results[,2:5] <- round(results[,2:5], 3)
+saveRDS(results, "data/test/clean/results.rds")
+file.copy("data/test/clean/results.rds", "textPredictor/data/results.rds")

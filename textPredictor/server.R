@@ -9,6 +9,7 @@ ngrams_accuracy <- readRDS("data/ngrams_smooth_trim1_prune.rds")
 ngrams_speed <- readRDS("data/ngrams_smooth_trim5_prune.rds")
 shortList <- readRDS("data/shortList.rds")
 sampleText <- readRDS("data/sampleText.rds")
+results <- readRDS("data/results.rds")
 topFive <- shortList[[1]]$words[1:5]
 cleanTextFull <- function(x) {
     x <-  iconv(x, "latin1", "ASCII", sub="")
@@ -141,5 +142,9 @@ shinyServer(function(input, output) {
 
     output$textOut <- renderText({
         cleanTextFull(sampleTextIn())
+    })
+    
+    output$resultsTable <- renderTable({
+        results
     })
 })

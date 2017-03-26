@@ -385,7 +385,7 @@ nextWord <- function(x, ngrams, num=1) {
     require(stringi)
     require(dplyr)
     # Clean the text with the same process that generated n-gram lists
-    x <- cleanText(x)
+    x <- cleanTextQuick(x)
     # Delete text before EOS punctuation since it will skew prediction.
     x <- gsub(".*<EOS>", "", x)
     x <- gsub(" $", "", x)
@@ -407,6 +407,7 @@ nextWord <- function(x, ngrams, num=1) {
     choices <- ngrams[[i]][search,]
     choices <- arrange(choices, desc(freq))
     words <- gsub(paste0(x," "), "", choices$words)
+    if (length(words)==0) { words <- c("the", "to", "and", "a", "of") }
     words[1:num]
 }
 

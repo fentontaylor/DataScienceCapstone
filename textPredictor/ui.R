@@ -201,8 +201,15 @@ ui <- dashboardPage(
                                   <span style="font-weight:bold;font-size:18px">Other Details</span>
                                   <p style="text-indent: 25px">The texts were split into 60% training, 20% development, and 20% test sets. The training set was further split equally into training and holdout sets. The holdout
                                   set is necessary for some smoothing techniques and methods for dealing with unseen words. However, for the current prediction algorithm, only simple Good-Turing smoothing was performed on the
-                                  counts of the N-grams of lengths 1 to 6. 
-                                  </p>')),
+                                  counts of the N-grams of lengths 1 to 6. The N-gram lists were "pruned" to only include the top 5 completions for each N-gram, since that is the maximum number of results the algorithm returns 
+                                  and it reduces file size and search time.
+                                  </p>
+                                  <span style="font-weight:bold;font-size:18px">Performance</span>
+                                  <p style="text-indent: 25px">Below is the accuracy of the two models. <em>smooth_trim5_prune</em> only includes N-grams that have a raw count of greater than 5. Similarly, <em>smooth_trim1_prune</em> includes only N-grams that occur more than once. The two 
+                                  models have fairly similar accuracy, but the smaller model was about 6 times faster. Both perform reasonably well for the purposes of this application, but could certainly be faster.
+                                  The bottleneck was identified as the part of the algorithm that searches the N-gram lists. Perhaps lookup tables or a more efficient use of data.tables would improve the speed.</p>'),
+                             tableOutput("resultsTable")
+                        ),
                     tabPanel(title=HTML('<span style="font-weight:bold; font-size:18px; color:#1E77AB">Source Code</span>'),
                              HTML("<br><p style='font-size:16px'>All relevant files for this project and application can be viewed at this 
                                   <a href='https://github.com/fentontaylor/DataScienceCapstone'>GitHub Repository</a>. Thanks for checking it out!</p>"))
