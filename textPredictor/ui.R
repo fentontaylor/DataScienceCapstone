@@ -62,7 +62,7 @@ ui <- dashboardPage(
                             <p style="text-indent: 25px"> Simply type in any phrase you want to the text box above.
                             The prediction algorithm will search up to the last 5 words from the
                             input string and return the most probable word(s) according to the desired 
-                            parameters, which can be selected in the "Paramters" box.</p>
+                            parameters, which can be selected in the "Parameters" box.</p>
                             <b>Parameters</b><br>
                             <ul>
                             <li><b>Which do you prefer?</b> Choose if you want the
@@ -71,7 +71,7 @@ ui <- dashboardPage(
                             search results, how many do you want to display? If there are fewer results
                             than your desired maximum, then only those results will be displayed.</li>
                             <li><b>Show prediction details:</b> If checked, will display the final string 
-                            used to generate the prediction results and the total number of results returned.</li>
+                            used to generate the prediction results.</li>
                             </ul>
                                 '),
                         footer = em("For more detailed information, see Documentation under Additional Info.")        
