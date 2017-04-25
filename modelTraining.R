@@ -74,7 +74,7 @@ if(!dir.exists("data/train/holdout")) dir.create("data/train/holdout")
 source("functions.R")
 
 ################################################################################
-# Split into training and holdout data for later use.
+# Split into training and holdout data for later use
 ################################################################################
 
 for(i in grep("txt$", dir("data/train"), value = T)){
@@ -115,7 +115,7 @@ create_ngrams("data/train/train/clean", "model_1", c("uni","bi","tri"))
 create_ngrams("data/train/holdout/clean", "model_1", c("uni","bi","tri"))
 
 ################################################################################
-# Split large training and holdout sets for processing 4-5-6-grams.
+# Split large training and holdout sets for processing 4-5-6-grams
 ################################################################################
 
 dir.create("data/trainSplit")
@@ -353,11 +353,10 @@ rm(list=ls())
 ################################################################################
 
 require(data.table)
-require(microbenchmark)
 source("functions.R")
 pstrings <- readRDS("data/test/clean/ts_opt.rds")
 pstrings <- data.table(pstrings)
-pstrings <- pstrings[1:10,]
+pstrings_test <- pstrings[1:10,]
 ng <- readRDS("data/train/train/clean/smooth/ngrams_smooth_trim5_prune.rds")
 ng2 <- readRDS("data/train/train/clean/smooth/ngrams_smooth_trim1_prune.rds")
 
@@ -390,3 +389,13 @@ results <- data.frame(model=c("smooth_trim5_prune", "smooth_trim1_prune"),
 results[,2:5] <- round(results[,2:5], 3)
 saveRDS(results, "data/test/clean/results.rds")
 file.copy("data/test/clean/results.rds", "textPredictor/data/results.rds")
+
+
+## Check to see which ngram length was searched for the result
+preds_trim5 <- sapply(pstrings_test$predString, function(x) nextWord2(x, ng, num=5))
+a <- nextWord2(pstrings_test$predString[5], ng, 5)
+sapply(a, class)
+ng_ret <- sapply(pstrings$predString, function(x) nextWord2(x, ng, num=5))
+ng_ret2 <- sapply(pstrings$predString, function(x) nextWord2(x, ng2, num=5))
+ng_returns <- list(trim_5_returns=ng_ret, trim_1_returns=ng_ret2)
+saveRDS(ng_returns, "data/train/train/clean/smooth/ng_returns.rds")

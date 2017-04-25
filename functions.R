@@ -437,3 +437,38 @@ pruneNgrams <- function(x, n, save = NULL) {
     if( !is.null(save) ) saveRDS(x, save)
     x
 }
+
+nextWord2 <- function(x, ngrams, num=1) {
+    # x: a character string
+    # ngrams: list of n-grams
+    # num: number of words to return
+    
+    require(stringi)
+    require(dplyr)
+    # Clean the text with the same process that generated n-gram lists
+    x <- cleanTextQuick(x)
+    # Delete text before EOS punctuation since it will skew prediction.
+    x <- gsub(".*<EOS>", "", x)
+    x <- gsub(" $", "", x)
+    # Get length of string for loop iterations
+    m <- length(stri_split_fixed(str=x, pattern=" ")[[1]])
+    m <- ifelse(m < 5, m, 5)
+    
+    for( i in m:1 ){
+        x <- stri_split_fixed(str=x, pattern=" ")[[1]]
+        n <- length(x)
+        # As i decreases, length of x is shortened to search smaller n-grams
+        x <- paste(x[(n-i+1):n], collapse=" ")
+        search <- grep(paste0("^", x, " "), ngrams[[i]]$words)
+        
+        if( length(search) == 0 ) { next }
+        break
+    }
+    
+    choices <- ngrams[[i]][search,]
+    choices <- arrange(choices, desc(freq))
+    words <- gsub(paste0(x," "), "", choices$words)
+    if (length(words)==0) { ng_ret = 1 }
+    else{ ng_ret = i+1 }
+    ng_ret
+}
