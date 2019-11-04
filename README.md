@@ -1,5 +1,5 @@
 ### Update
-It's strange to look back at my own code from 3 years ago as I near the end of my time at Turing. Now that I understand and can implement the pillars of OOP in my code, the functions I wrote in this project look a kindergartener's poem on a fridge. However, I am not at all embarassed by the work here. My prediction algorithm is pretty decent, actually (due to my attention to detail). And the deployed app is pretty cool. But mostly, this reminds me how much I've elevated my skills at Turing. I am not writing like the Shakespeare of programming yet, but I am improving rapidly and show no signs of slowing down.
+It's strange to look back at my own code from 3 years ago as I near the end of my time at Turing. Now that I understand and can implement the pillars of OOP in my code, the functions I wrote in this project look a kindergartener's poem on a fridge. However, I am not at all embarassed by the work here. My prediction algorithm is actually pretty decent, due to my attention to detail. And the deployed app is pretty cool. But mostly, this reminds me how much I've elevated my skills at Turing. I am not writing like the Shakespeare of programming yet, but I am improving rapidly and show no signs of slowing down.
 
 ## Welcome
 
